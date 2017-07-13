@@ -103,6 +103,77 @@ class SelectorCV(ModelSelector):
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
-
+        from sklearn.model_selection import KFold
+        #print("SELECTOR CV STARTED 1")
         # TODO implement model selection using CV
-        raise NotImplementedError
+        # split sequences in kfold 
+        kfold_len = min(3, len(self.sequences))
+        split_method = KFold(kfold_len)
+        train_data_x = []
+        train_data_lengths = []
+        test_data_x = []
+        test_data_lengths = []
+        sequences = np.asarray(self.sequences)
+        lengths = np.asarray(self.lengths)
+        #print("sequences shape ", sequences)
+        
+        # number of state we might need to use
+        n_best = self.min_n_components
+        avg_best_score = 0
+        # start the loop for experiment different model
+        for comp_count in range(self.min_n_components, self.max_n_components + 1):
+            # split the data in each fold 
+            #print("Comp. Count: ",comp_count)
+            avg_score = 0
+            total_score = 0
+            count = 0
+            for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
+                try:
+                    train_data_x =  np.vstack(sequences[cv_train_idx])
+                    train_data_lengths = lengths[cv_train_idx]
+                    test_data_x = np.vstack(sequences[cv_test_idx])
+                    test_data_lengths = lengths[cv_test_idx]
+                    #print ("Train data\n",train_data_x)
+                    #print ("Train data squeeze\n",np.squeeze(train_data_x))
+                    #print ("Train data lengths shape \n",train_data_lengths.shape)
+                    #print ("train data lengths\n", train_data_lengths)
+                    model = GaussianHMM(comp_count,
+                                n_iter=1000,
+                                random_state=self.random_state, 
+                                verbose=False).fit(train_data_x,train_data_lengths)
+
+                    #print ("test data\n",test_data_x)
+                    #print ("Train data squeeze\n",np.squeeze(train_data_x))
+                    #print ("test data lengths shape \n",test_data_lengths.shape)
+                    #print ("test data lengths\n", test_data_lengths)
+                    model_score = model.score(test_data_x, test_data_lengths)
+                except:
+                    continue # try next one 
+                # if nothing is wrong then we accumulate the stats
+                count += 1
+                total_score += model_score
+            # compare with best score
+            if (count != 0): 
+                avg_score = total_score / count
+            # swap score if need to
+            if (avg_best_score == 0) or (avg_score > avg_best_score):
+                avg_best_score = avg_score
+                n_best = comp_count
+        # now return the best model 
+        return self.base_model(n_best)
+
+        
+                
+
+           
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
