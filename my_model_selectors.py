@@ -75,9 +75,38 @@ class SelectorBIC(ModelSelector):
         :return: GaussianHMM object
         """
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        best_bic = None
+        best_model = None
+        # loop through all model and calculate BIC
+        for comp_count in range(self.min_n_components, self.max_n_components + 1): 
+            # BIC = -2 * logL + free_parameters * log(number of model states)
+            BIC = None
+            model = None
+            try:    
+                # get the base model for the specific topology
+                # base model already call fit 
+                model = self.base_model(comp_count)
+                #print ("Finish fit model")
+                # now we need to calculate BIC
+                logL = model.score(self.X, self.lengths)
+                #print ("LogL: ",logL)
+                # free_parameters = transistion probs(n*n) + means(n*f) + covars(n*f) - 1
+                # f: number of features used to train the model
+                free_parameters = comp_count**2 + 2 * comp_count * model.n_features - 1
+                #print ("Free parameters: ",free_parameters)
+                BIC = -2 * logL + free_parameters * math.log(comp_count)
+                #print ("BIC ",BIC)
+            except:
+                # ignore bad model
+                #print("Bad model. Try next one. n: ", comp_count)
+                continue
+            # update best model as the smaller BIC the better 
+            if (best_bic == None) or (BIC < best_bic):
+                #print("Update model for word: ", self.this_word)
+                best_bic = BIC
+                best_model = model
 
-        # TODO implement model selection based on BIC scores
-        raise NotImplementedError
+        return best_model
 
 
 class SelectorDIC(ModelSelector):
@@ -119,7 +148,7 @@ class SelectorCV(ModelSelector):
         
         # number of state we might need to use
         n_best = self.min_n_components
-        avg_best_score = 0
+        avg_best_score = None
         # start the loop for experiment different model
         for comp_count in range(self.min_n_components, self.max_n_components + 1):
             # split the data in each fold 
@@ -133,19 +162,11 @@ class SelectorCV(ModelSelector):
                     train_data_lengths = lengths[cv_train_idx]
                     test_data_x = np.vstack(sequences[cv_test_idx])
                     test_data_lengths = lengths[cv_test_idx]
-                    #print ("Train data\n",train_data_x)
-                    #print ("Train data squeeze\n",np.squeeze(train_data_x))
-                    #print ("Train data lengths shape \n",train_data_lengths.shape)
-                    #print ("train data lengths\n", train_data_lengths)
                     model = GaussianHMM(comp_count,
                                 n_iter=1000,
                                 random_state=self.random_state, 
                                 verbose=False).fit(train_data_x,train_data_lengths)
 
-                    #print ("test data\n",test_data_x)
-                    #print ("Train data squeeze\n",np.squeeze(train_data_x))
-                    #print ("test data lengths shape \n",test_data_lengths.shape)
-                    #print ("test data lengths\n", test_data_lengths)
                     model_score = model.score(test_data_x, test_data_lengths)
                 except:
                     continue # try next one 
@@ -156,7 +177,7 @@ class SelectorCV(ModelSelector):
             if (count != 0): 
                 avg_score = total_score / count
             # swap score if need to
-            if (avg_best_score == 0) or (avg_score > avg_best_score):
+            if (avg_best_score == None) or (avg_score > avg_best_score):
                 avg_best_score = avg_score
                 n_best = comp_count
         # now return the best model 
