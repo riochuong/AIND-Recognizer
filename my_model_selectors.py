@@ -122,7 +122,43 @@ class SelectorDIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        # DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
+        # DIC = logL(this_word) - 1 / (total_words - 1) SUM: all logL(other_words but this_word)
+        best_dic = None
+        best_model = None
+        total_words = len(self.words.keys())
+        for comp_count in range(self.min_n_components, self.max_n_components + 1): 
+            
+            model = None
+            DIC = None
+            try:
+            # fit the model for self.X and self.lengths
+                model = self.base_model(comp_count)
+                logL_this_word = model.score(self.X, self.lengths)
+            # now calculate the sum of all other words liklihood
+                others_logL_sum = 0
+                for word in self.words.keys():
+                    # skip this_word
+                    if word == self.this_word:
+                        continue
+                    # get likelihood and sum it
+                    other_X, other_lengths = self.hwords[word]
+                    others_logL_sum += model.score(other_X, other_lengths)
+            # not checking division by zero here 
+            # as it will hit the except case and we will ignore 
+            # the model .. this should not happen probably
+                DIC = logL_this_word - 1 / (total_words - 1) * others_logL_sum
+            except:
+                continue
+
+            # higher DIC score means better discriminant model which
+            # improved accuracy for classification 
+            if (best_dic == None) or (DIC > best_dic):
+                best_dic = DIC
+                best_model = model
+
+        # return the best model 
+        return best_model
 
 
 class SelectorCV(ModelSelector):
