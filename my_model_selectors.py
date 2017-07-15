@@ -169,15 +169,7 @@ class SelectorCV(ModelSelector):
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         from sklearn.model_selection import KFold
-        #print("SELECTOR CV STARTED 1")
-        # TODO implement model selection using CV
-        # split sequences in kfold 
         kfold_len = min(3, len(self.sequences))
-        split_method = KFold(kfold_len)
-        train_data_x = []
-        train_data_lengths = []
-        test_data_x = []
-        test_data_lengths = []
         sequences = np.asarray(self.sequences)
         lengths = np.asarray(self.lengths)
         #print("sequences shape ", sequences)
@@ -192,30 +184,53 @@ class SelectorCV(ModelSelector):
             avg_score = 0
             total_score = 0
             count = 0
-            for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
-                try:
-                    train_data_x =  np.vstack(sequences[cv_train_idx])
-                    train_data_lengths = lengths[cv_train_idx]
-                    test_data_x = np.vstack(sequences[cv_test_idx])
-                    test_data_lengths = lengths[cv_test_idx]
-                    model = GaussianHMM(comp_count,
-                                n_iter=1000,
-                                random_state=self.random_state, 
-                                verbose=False).fit(train_data_x,train_data_lengths)
+            
+            # Kfold can only word with length greater than 2 so it can split test and training
+            if (kfold_len >= 2): 
+            #we can apply kfold here 
+                split_method = KFold(kfold_len)
+                train_data_x = []
+                train_data_lengths = []
+                test_data_x = []
+                test_data_lengths = []
+                for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
+                    try:
+                        train_data_x =  np.vstack(sequences[cv_train_idx])
+                        train_data_lengths = lengths[cv_train_idx]
+                        test_data_x = np.vstack(sequences[cv_test_idx])
+                        test_data_lengths = lengths[cv_test_idx]
+                        model = GaussianHMM(comp_count,
+                                    n_iter=1000,
+                                    random_state=self.random_state, 
+                                    verbose=False).fit(train_data_x,train_data_lengths)
 
-                    model_score = model.score(test_data_x, test_data_lengths)
+                        model_score = model.score(test_data_x, test_data_lengths)
+                    except:
+                        continue # try next one 
+                    # if nothing is wrong then we accumulate the stats
+                    count += 1
+                    total_score += model_score
+                    # compare with best score
+            else:
+                try:
+                    model = GaussianHMM(comp_count,
+                                        n_iter=1000,
+                                        random_state=self.random_state, 
+                                        verbose=False).fit(self.X, self.lengths)
+                    # assign total score here 
+                    total_score = model.score(self.X, self.lengths)
+                    count = 1
                 except:
-                    continue # try next one 
-                # if nothing is wrong then we accumulate the stats
-                count += 1
-                total_score += model_score
-            # compare with best score
+                    continue
+
+            # check for current count and score 
             if (count != 0): 
                 avg_score = total_score / count
             # swap score if need to
             if (avg_best_score == None) or (avg_score > avg_best_score):
                 avg_best_score = avg_score
                 n_best = comp_count
+
         # now return the best model 
         return self.base_model(n_best)
 

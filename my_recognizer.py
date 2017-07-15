@@ -1,5 +1,6 @@
 import warnings
 from asl_data import SinglesData
+from math import inf as INF
 
 
 def recognize(models: dict, test_set: SinglesData):
@@ -20,6 +21,38 @@ def recognize(models: dict, test_set: SinglesData):
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     probabilities = []
     guesses = []
-    # TODO implement the recognizer
-    # return probabilities, guesses
-    raise NotImplementedError
+
+    # iterate through word to find the best word
+    for word_id, model_word in enumerate(test_set.wordlist):
+      # if we cannot find a model for the key
+      prob_dict = {}
+      best_word_id = None
+      best_score = None
+      best_word = None
+      x, lengths = test_set.get_all_Xlengths()[word_id]
+      
+      # spin through all the model to check which word is 
+      # this best match
+      for word in test_set.wordlist:
+        score = None
+        try:
+          model = models[word]
+          score = model.score(x,lengths)
+        except:
+          # assign super small value for not matching anything word
+          score = -INF
+        # update prob dict
+        prob_dict[word] = score
+        # update best word
+        if (best_score == None) or (score > best_score):
+          best_score = score
+          best_word_id = word_id
+          best_word = word
+
+      # now update the guesses dict
+      if (best_score != None):
+        probabilities.append(prob_dict)
+        guesses.append(best_word)
+
+
+    return (probabilities, guesses)
