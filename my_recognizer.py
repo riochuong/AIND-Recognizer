@@ -21,6 +21,7 @@ def recognize(models: dict, test_set: SinglesData):
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     probabilities = []
     guesses = []
+    #print (test_set.wordlist)
 
     # iterate through word to find the best word
     for word_id, model_word in enumerate(test_set.wordlist):
@@ -33,21 +34,21 @@ def recognize(models: dict, test_set: SinglesData):
       
       # spin through all the model to check which word is 
       # this best match
-      for word in test_set.wordlist:
+      for key_word in models.keys():
         score = None
         try:
-          model = models[word]
+          model = models[key_word]
           score = model.score(x,lengths)
         except:
           # assign super small value for not matching anything word
           score = -INF
         # update prob dict
-        prob_dict[word] = score
+        prob_dict[key_word] = score
         # update best word
         if (best_score == None) or (score > best_score):
           best_score = score
           best_word_id = word_id
-          best_word = word
+          best_word = key_word
 
       # now update the guesses dict
       if (best_score != None):
